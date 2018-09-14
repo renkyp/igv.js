@@ -266,6 +266,7 @@ var igv = (function (igv) {
         nameValues.push("<hr>");
         nameValues.push({name: 'Genomic Location: ', value: igv.numberFormatter(1 + genomicLocation)});
         nameValues.push({name: 'Read Base:', value: this.readBaseAt(genomicLocation)});
+        nameValues.push({name: 'Read Base Qual:', value: this.readBaseQualAt(genomicLocation)});
 
         return nameValues;
 
@@ -282,6 +283,29 @@ var igv = (function (igv) {
 
         if (block) {
             return block.baseAt(genomicLocation);
+        }
+        else {
+            return undefined;
+        }
+
+        function blockAtGenomicLocation(blocks, genomicLocation) {
+
+            for (let i = 0; i < blocks.length; i++) {
+                const block = blocks[i];
+                if (genomicLocation >= block.start && genomicLocation <= block.start + block.len) {
+                    return block;
+                }
+            }
+            return undefined;
+        }
+    }
+
+    igv.BamAlignment.prototype.readBaseQualAt = function (genomicLocation) {
+
+        const block = blockAtGenomicLocation(this.blocks, genomicLocation);
+
+        if (block) {
+            return block.qualityAt(genomicLocation);
         }
         else {
             return undefined;
