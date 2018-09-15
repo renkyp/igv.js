@@ -732,6 +732,16 @@ var igv = (function (igv) {
 
         }
 
+        this.$viewportContainer.on("wheel", function(e) {
+
+            e.preventDefault(); 
+            console.log(self.$innerScroll.position().top);
+            console.log(e);   
+            
+            self.moveScrollerBy(-e.originalEvent.deltaY);
+            e.stopPropagation();    
+        }); 
+
     };
 
     TrackScrollbar.prototype.moveScrollerBy = function (delta) {
