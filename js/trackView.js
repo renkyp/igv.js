@@ -87,6 +87,7 @@ var igv = (function (igv) {
             // do nuthin
         } else {
             attachDragWidget.call(this, $(this.trackDiv), this.$viewportContainer);
+            attachDragBottomBar.call(this, $(this.trackDiv), this.$viewportContainer);
         }
 
         // Create color picker.
@@ -306,6 +307,56 @@ var igv = (function (igv) {
             }
 
             dragged = undefined;
+        });
+
+    }
+
+
+    function attachDragBottomBar($track, $viewportContainer) {
+
+        var self = this;
+
+        var dragging = false; 
+        var originalY; 
+        var releaseY; 
+
+        self.$trackviewDivDragbar = $('<div class="trackview_div_dragbar">');
+        $(self.trackDiv).append(self.$trackviewDivDragbar);
+
+       
+
+        self.$trackviewDivDragbar.on('mousedown', function(e) {
+            e.preventDefault();
+
+            originalY = e.pageY;
+            dragging = true;
+            var ghostbar = $('<div>',
+                            {id:'ghostbar',
+                             css: {
+                                    width: self.$trackviewDivDragbar.outerWidth(),
+                                    bottom: e.pageY+2,
+                                    left: self.$trackviewDivDragbar.offset().left
+                                   }
+                            }).appendTo('body');
+
+
+            $(document).on('mousemove', function(e){
+              ghostbar.css("top",e.pageY+2);
+            });
+            e.stopPropagation();
+        });
+
+        $(document).on('mouseup', function(e){
+            e.preventDefault();
+            if (dragging)
+            {
+                releaseY = e.pageY;
+                self.setTrackHeight(self.track.height + releaseY - originalY);
+                $('#ghostbar').remove();
+                $(document).unbind('mousemove');
+                dragging = false;
+            }
+            e.stopPropagation();
         });
 
     }
@@ -734,9 +785,7 @@ var igv = (function (igv) {
 
         this.$viewportContainer.on("wheel", function(e) {
 
-            e.preventDefault(); 
-            console.log(self.$innerScroll.position().top);
-            console.log(e);   
+            e.preventDefault();   
             
             self.moveScrollerBy(-e.originalEvent.deltaY);
             e.stopPropagation();    
