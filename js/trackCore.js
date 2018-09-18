@@ -491,7 +491,7 @@ var igv = (function (igv) {
      */
     igv.trackMenuItemList = function (popover, trackView) {
 
-        const vizWindowTypes = new Set(['alignment', 'annotation', 'variant']);
+        const vizWindowTypes = new Set(['alignment', 'annotation', 'variant', 'eqtl']);
 
         let menuItems = [];
 
@@ -545,8 +545,8 @@ var igv = (function (igv) {
                     $e = $('<div>');
                     $e.text(item.label)
                 }
-                else {
-                    $e = $(item.label);
+                else if (typeof item === 'string') {
+                    $e = $(item);
                 }
 
                 if (0 === i) {
@@ -558,6 +558,10 @@ var igv = (function (igv) {
                     $e.on('touchend', function (e) {
                         handleClick(e);
                     });
+                    $e.on('mouseup', function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    })
 
                     function handleClick(e) {
                         item.click();
@@ -620,7 +624,7 @@ var igv = (function (igv) {
                 }
 
                 trackView.track.visibilityWindow = value;
-                trackView.track.config = value;               // Hack for session state.
+                trackView.track.config.visibilityWindow = value;
 
                 trackView.updateViews();
             };
@@ -648,7 +652,6 @@ var igv = (function (igv) {
             menuClickHandler;
 
         $e = $('<div>');
-        $e.addClass('igv-track-menu-border-top');
         $e.text('Remove track');
 
         menuClickHandler = function () {
@@ -789,7 +792,7 @@ var igv = (function (igv) {
          */
         getState: function () {
 
-            const config = this.config;
+            const config = Object.assign({}, this.config);
             const self = this;
 
             Object.keys(config).forEach(function (key) {

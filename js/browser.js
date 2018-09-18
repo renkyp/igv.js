@@ -31,7 +31,6 @@ var igv = (function (igv) {
         this.guid = igv.guid();
 
         this.namespace = '.browser_' + this.guid;
-        this.document_click_browser_str = 'click.browser.' + this.guid;
 
         this.config = options;
 
@@ -150,6 +149,30 @@ var igv = (function (igv) {
 
             .then(function (config) {
                 return self.loadGenome(config.reference || config.genome, config.locus)
+            })
+
+            .then(function (genome) {
+
+                // Restore gtex selections.  
+                if (config.gtexSelections) {
+
+                    const genomicStates = {};
+
+                    for (let gs of self.genomicStateList) {
+                        genomicStates[gs.locusSearchString] = gs;
+                    }
+
+                    for (let s of Object.getOwnPropertyNames(config.gtexSelections)) {
+                        const gs = genomicStates[s];
+                        if (gs) {
+                            const gene = config.gtexSelections[s].gene;
+                            const snp = config.gtexSelections[s].snp;
+                            gs.selection = new igv.GtexSelection(gene, snp);
+                        }
+                    }
+                }
+
+                return genome;
             })
 
             .then(function (genome) {
@@ -703,6 +726,7 @@ var igv = (function (igv) {
 
     };
 
+
     igv.Browser.prototype.removeTrackByName = function (name) {
 
         var remove;
@@ -770,71 +794,6 @@ var igv = (function (igv) {
             }
         })
         return tracks;
-    };
-
-    igv.Browser.prototype.reduceTrackOrder = function (trackView) {
-
-        var indices = [],
-            raisable,
-            raiseableOrder;
-
-        if (1 === this.trackViews.length) {
-            return;
-        }
-
-        this.trackViews.forEach(function (tv, i, tvs) {
-
-            indices.push({trackView: tv, index: i});
-
-            if (trackView === tv) {
-                raisable = indices[i];
-            }
-
-        });
-
-        if (0 === raisable.index) {
-            return;
-        }
-
-        raiseableOrder = raisable.trackView.track.order;
-        raisable.trackView.track.order = indices[raisable.index - 1].trackView.track.order;
-        indices[raisable.index - 1].trackView.track.order = raiseableOrder;
-
-        this.reorderTracks();
-
-    };
-
-    igv.Browser.prototype.increaseTrackOrder = function (trackView) {
-
-        var j,
-            indices = [],
-            raisable,
-            raiseableOrder;
-
-        if (1 === this.trackViews.length) {
-            return;
-        }
-
-        this.trackViews.forEach(function (tv, i, tvs) {
-
-            indices.push({trackView: tv, index: i});
-
-            if (trackView === tv) {
-                raisable = indices[i];
-            }
-
-        });
-
-        if ((this.trackViews.length - 1) === raisable.index) {
-            return;
-        }
-
-        raiseableOrder = raisable.trackView.track.order;
-        raisable.trackView.track.order = indices[1 + raisable.index].trackView.track.order;
-        indices[1 + raisable.index].trackView.track.order = raiseableOrder;
-
-        this.reorderTracks();
-
     };
 
     igv.Browser.prototype.setTrackHeight = function (newHeight) {
@@ -1448,6 +1407,11 @@ var igv = (function (igv) {
 
                     self.buildViewportsWithGenomicStateList(genomicStateList);
 
+                    // assign ids to the state objects
+                    for(let gs of genomicStateList) {
+                        gs.id = igv.guid();
+                    }
+
                     return genomicStateList
 
                 } else {
@@ -1924,14 +1888,31 @@ var igv = (function (igv) {
         };
 
         // Use rulerTrack to get current loci.   This is really obtuse and fragile
-        var locus = [];
+        const locus = [];
+        const gtexSelections = {};
         this.rulerTrack.trackView.viewports.forEach(function (viewport) {
-            const pixelWidth = viewport.$viewport[0].clientWidth;
-            locus.push(viewport.genomicState.referenceFrame.showLocus(pixelWidth));
 
-        })
+            const genomicState = viewport.genomicState;
+            const pixelWidth = viewport.$viewport[0].clientWidth;
+            const locusString = genomicState.referenceFrame.showLocus(pixelWidth);
+            locus.push(locusString);
+
+            if (genomicState.selection) {
+                const selection = {
+                    gene: genomicState.selection.gene,
+                    snp: genomicState.selection.snp
+                };
+
+                gtexSelections[locusString] = selection;
+            }
+        });
+
         json["locus"] = locus;
 
+        const gtexKeys = Object.getOwnPropertyNames(gtexSelections);
+        if (gtexKeys.length > 0) {
+            json["gtexSelections"] = gtexSelections;
+        }
 
         trackJson = [];
         order = 0;
@@ -1952,7 +1933,7 @@ var igv = (function (igv) {
                 if (config.browser) {
                     delete config.browser;
                 }
-                config.order = order++;
+                config.order = track.order; //order++;
                 trackJson.push(config);
             }
         });
@@ -2058,7 +2039,7 @@ var igv = (function (igv) {
     };
 
 
-    igv.Browser.prototype.cancelDrag = function () {
+    igv.Browser.prototype.cancelTrackPan = function () {
 
         if (this.isDragging) {
             this.updateViews();
@@ -2070,6 +2051,70 @@ var igv = (function (igv) {
 
     }
 
+
+    igv.Browser.prototype.startTrackDrag = function (trackView) {
+
+        this.dragTrack = trackView;
+
+    }
+
+    igv.Browser.prototype.updateTrackDrag = function (dragDestination) {
+
+        if (dragDestination && this.dragTrack) {
+
+            const dragged = this.dragTrack;
+            const indexDestination = this.trackViews.indexOf(dragDestination);
+            const indexDragged = this.trackViews.indexOf(dragged);
+            const trackViews = this.trackViews;
+
+            trackViews[indexDestination] = dragged;
+            trackViews[indexDragged] = dragDestination;
+
+            const newOrder = this.trackViews[indexDestination].track.order;
+            this.trackViews[indexDragged].track.order = newOrder;
+
+            const nTracks = trackViews.length;
+            let lastOrder = newOrder;
+
+            if (indexDestination < indexDragged) {
+                // Displace tracks below
+
+                for (let i = indexDestination + 1; i < nTracks; i++) {
+                    const track = trackViews[i].track;
+                    if (track.order <= lastOrder) {
+                        track.order = Math.min(Number.MAX_VALUE, lastOrder + 1);
+                        lastOrder = track.order;
+                    }
+                    else {
+                        break;
+                    }
+                }
+            }
+            else {
+                // Displace tracks above.  First track (index 0) is "ruler"
+                for (let i = indexDestination - 1; i > 0; i--) {
+                    const track = trackViews[i].track;
+                    if (track.order >= lastOrder) {
+                        track.order = Math.max(-Number.MAX_VALUE, lastOrder - 1);
+                        lastOrder = track.order;
+                    }
+                    else {
+                        break;
+                    }
+                }
+            }
+            this.reorderTracks();
+        }
+    }
+
+    igv.Browser.prototype.endTrackDrag = function () {
+        if (this.dragTrack) {
+            this.dragTrack.$trackDragScrim.hide();
+        }
+        this.dragTrack = undefined;
+    }
+
+
     /**
      * Mouse handlers to support drag (pan)
      */
@@ -2080,6 +2125,9 @@ var igv = (function (igv) {
         $(window).on('resize' + this.namespace, function () {
             self.resize();
         });
+
+        $(this.root).on('mouseup', mouseUpOrLeave);
+        $(this.root).on('mouseleave', mouseUpOrLeave);
 
         $(this.trackContainerDiv).on('mousemove', handleMouseMove);
 
@@ -2097,6 +2145,7 @@ var igv = (function (igv) {
 
             e.preventDefault();
 
+
             if (self.loadInProgress()) {
                 return;
             }
@@ -2112,8 +2161,8 @@ var igv = (function (igv) {
                 viewportWidth = viewport.$viewport.width();
                 referenceFrame = viewport.genomicState.referenceFrame;
 
-                if(!self.isDragging && !self.isScrolling) {
-                    if(horizontal) {
+                if (!self.isDragging && !self.isScrolling) {
+                    if (horizontal) {
                         if (self.vpMouseDown.mouseDownX && Math.abs(coords.x - self.vpMouseDown.mouseDownX) > self.constants.dragThreshold) {
                             self.isDragging = true;
                         }
@@ -2144,13 +2193,15 @@ var igv = (function (igv) {
                     self.vpMouseDown.viewport.trackView.scrollBy(delta);
                 }
 
+
                 self.vpMouseDown.lastMouseX = coords.x;
                 self.vpMouseDown.lastMouseY = coords.y
             }
         }
 
         function mouseUpOrLeave(e) {
-            self.cancelDrag();
+            self.cancelTrackPan();
+            self.endTrackDrag();
         }
     }
 

@@ -481,7 +481,8 @@ var igv = (function (igv) {
         const browser = this.browser;
 
         let lastMouseX;
-        let mouseDownX;
+        let mouseDownCoords;
+
         let popupTimerID;
 
         let lastClickTime = 0;
@@ -529,11 +530,13 @@ var igv = (function (igv) {
          */
         this.$viewport.on('mousedown', function (e) {
             browser.mouseDownOnViewport(e, self);
+            mouseDownCoords = igv.pageCoordinates(e);
 
         });
 
         this.$viewport.on('touchstart', function (e) {
             browser.mouseDownOnViewport(e, self);
+            mouseDownCoords = igv.pageCoordinates(e);
         });
 
         /**
@@ -542,25 +545,43 @@ var igv = (function (igv) {
          */
         this.$viewport.on('mouseup', handleMouseUp);
 
+        this.$viewport.on('click', handleClick);
+
         function handleMouseUp(e) {
 
             // Any mouse up cancels drag and scrolling
             if (self.browser.isDragging || self.browser.isScrolling) {
-                self.browser.cancelDrag();
+                self.browser.cancelTrackPan();
                 e.preventDefault();
                 e.stopPropagation();
                 return;
             }
 
+            self.browser.cancelTrackPan();
+            self.browser.endTrackDrag();
+        }
 
-            self.browser.cancelDrag();
+        function handleClick(e) {
 
             if (3 === e.which || e.ctrlKey) {
                 return;
             }
-
+console.log("click");
             // Close any currently open popups
             $('.igv-popover').hide();
+
+            // // Interpret mouseDown + mouseUp < 5 pixels as a click.
+            // if(!mouseDownCoords) {
+            //     return;
+            // }
+            // const coords = igv.pageCoordinates(e);
+            // const dx = coords.x - mouseDownCoords.x;
+            // const dy = coords.y - mouseDownCoords.y;
+            // const dist2 = dx*dx + dy*dy;
+            // if(dist2 > 25) {
+            //     mouseDownCoords = undefined;
+            //     return;
+            // }
 
             // Treat as a mouse click, its either a single or double click.
             // Handle here and stop propogation / default
@@ -712,17 +733,16 @@ var igv = (function (igv) {
 
     function getFeatures(chr, start, end, bpPerPixel) {
 
-        var self = this,
-            track;
+        const self = this;
 
-        track = self.trackView.track;
+        const track = self.trackView.track;
 
         if (self.tile && self.tile.containsRange(chr, start, end, bpPerPixel)) {
             return Promise.resolve(self.tile.features);
         }
         else if (typeof track.getFeatures === "function") {
 
-            return track.getFeatures(chr, start, end, bpPerPixel)
+            return track.getFeatures(chr, start, end, bpPerPixel, self)
 
                 .then(function (features) {
 

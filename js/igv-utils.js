@@ -57,8 +57,24 @@ var igv = (function (igv) {
         $fa = igv.createIcon("times");
         $header.append($fa);
 
-        $fa.on('click', closeHandler);
-        $fa.on('touchend', closeHandler);
+        $fa.on('mousedown', function (e) {
+            e.stopPropagation();
+        })
+
+        $fa.on('mouseup', function (e) {
+            e.stopPropagation();
+        })
+
+        $fa.on('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeHandler(e);
+        });
+        $fa.on('touchend', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeHandler(e);
+        });
 
         // $generic_container.draggable({handle: $header.get(0)});
         igv.makeDraggable($generic_container.get(0), $header.get(0));
@@ -167,8 +183,15 @@ var igv = (function (igv) {
         $fa.on('click', closeHandler);
         $fa.on('touchend', closeHandler);
 
+        $fa.on('mousedown', function (e) {
+            e.stopPropagation();
+        })
+
+        $fa.on('mouseup', function (e) {
+            e.stopPropagation();
+        })
+
         $fa.on('touchstart', function (e) {
-            e.preventDefault();
             e.stopPropagation();
         })
 
@@ -342,9 +365,9 @@ var igv = (function (igv) {
 
     igv.pageCoordinates = function (e) {
 
-        if(e.type.startsWith("touch")) {
+        if (e.type.startsWith("touch")) {
             const touch = e.touches[0];
-            return {x:touch.pageX, y:touch.pageY};
+            return {x: touch.pageX, y: touch.pageY};
         }
         else {
             return {x: e.pageX, y: e.pageY}
@@ -500,6 +523,31 @@ var igv = (function (igv) {
     };
 
     /**
+     * Parse a locus string and return a range object.  Locus string is of the form chr:start-end.  End is optional
+     *
+     */
+    igv.parseLocusString = function (string) {
+
+        const t1 = string.split(":");
+        const t2 = t1[1].split("-");
+
+        const range = {
+            chr: t1[0],
+            start: Number.parseInt(t2[0]) - 1
+        };
+
+        if (t2.length > 1) {
+            range.end = Number.parseInt(t2[1]);
+        }
+        else {
+            range.end = range.start + 1;
+        }
+
+        return range;
+
+    }
+
+    /**
      * Covers string literals and String objects
      * @param x
      * @returns {boolean}
@@ -515,7 +563,7 @@ var igv = (function (igv) {
      * @returns {boolean}
      */
 
-    igv.isMobile = function() {
+    igv.isMobile = function () {
 
         const a = (navigator.userAgent || navigator.vendor || window.opera);
         return (/(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino/i.test(a) ||

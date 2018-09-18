@@ -234,13 +234,8 @@ var igv = (function (igv) {
 
     function attachDragWidget($track, $viewportContainer) {
 
-        var self = this,
-            indexDestination,
-            indexDragged,
-            str;
-
+        const self = this;
         const browser = this.browser;
-        const namespace = this.namespace;
 
         this.$trackDragScrim = $('<div class="igv-track-drag-scrim">');
         $viewportContainer.append(this.$trackDragScrim);
@@ -251,64 +246,36 @@ var igv = (function (igv) {
 
         self.$trackManipulationHandle.on('mousedown', function (e) {
             e.preventDefault();
-            self.isMouseDown = true;
-            dragged = self;
+            e.stopPropagation();
+            self.$trackDragScrim.show();
+            browser.startTrackDrag(self);
         });
 
         self.$trackManipulationHandle.on('mouseup', function (e) {
             e.preventDefault();
-            self.isMouseDown = undefined;
+            e.stopPropagation();
+            browser.endTrackDrag();
+            self.$trackDragScrim.hide();
         });
 
-        self.$trackManipulationHandle.on('mouseenter', function (e) {
-            e.preventDefault();
-            self.isMouseIn = true;
-            dragDestination = self;
+        $track.on('mouseenter', function (e) {
 
-            if (undefined === dragged) {
-                self.$trackDragScrim.show();
-            } else if (self === dragged) {
-                self.$trackDragScrim.show();
-            }
-
-            if ((dragDestination && dragged) && (dragDestination !== dragged)) {
-
-                indexDestination = browser.trackViews.indexOf(dragDestination);
-                indexDragged = browser.trackViews.indexOf(dragged);
-
-                browser.trackViews[indexDestination] = dragged;
-                browser.trackViews[indexDragged] = dragDestination;
-
-                if (indexDestination < indexDragged) {
-                    $(dragged.trackDiv).insertBefore($(dragDestination.trackDiv));
-                } else {
-                    $(dragged.trackDiv).insertAfter($(dragDestination.trackDiv));
-                }
-
+            if (browser.dragTrack) {
+                e.preventDefault();
+                e.stopPropagation();
+                browser.updateTrackDrag(self);
             }
 
         });
 
         self.$trackManipulationHandle.on('mouseleave', function (e) {
-            e.preventDefault();
-            self.isMouseIn = undefined;
-            dragDestination = undefined;
 
-            if (self !== dragged) {
+            if (!browser.dragTrack) {
+                e.preventDefault();
+                e.stopPropagation();
                 self.$trackDragScrim.hide();
             }
-
         });
-
-        $(document).on('mouseup' + namespace, function (e) {
-
-            if (dragged) {
-                dragged.$trackDragScrim.hide();
-            }
-
-            dragged = undefined;
-        });
-
     }
 
 
